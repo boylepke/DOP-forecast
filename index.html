@@ -509,6 +509,7 @@
                         <option value="2">Survey Grade (2m)</option>
                         <option value="1">Dual Frequency (1m)</option>
                         <option value="0.5">Professional (0.5m)</option>
+                        <option value="0.005">ADAS (sub-centimeter)</option>
                     </select>
                 </div>
 
@@ -543,6 +544,25 @@
                         <div class="checkbox-item">
                             <input type="checkbox" id="beidou" checked>
                             <label for="beidou">🟠 BeiDou</label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- DOP Signal Selector -->
+                <div class="control-group">
+                    <label>DOP Signals to Display</label>
+                    <div class="checkbox-group">
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="showHDOP" checked onchange="updateCharts()">
+                            <label for="showHDOP">📊 HDOP</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="showVDOP" checked onchange="updateCharts()">
+                            <label for="showVDOP">📊 VDOP</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="showPDOP" checked onchange="updateCharts()">
+                            <label for="showPDOP">📊 PDOP</label>
                         </div>
                     </div>
                 </div>
@@ -835,46 +855,68 @@
         // ===== CHARTS =====
         function updateCharts() {
             const data = appState.forecastData;
+            const showHDOP = document.getElementById('showHDOP').checked;
+            const showVDOP = document.getElementById('showVDOP').checked;
+            const showPDOP = document.getElementById('showPDOP').checked;
 
             // DOP Chart
             if (charts.dop) charts.dop.destroy();
             const dopCtx = document.getElementById('dopChart').getContext('2d');
+            
+            const datasets = [];
+            if (showHDOP) {
+                datasets.push({
+                    label: 'HDOP',
+                    data: data.map(d => d.hdop),
+                    borderColor: '#3b82f6',
+                    borderWidth: 3,
+                    fill: false,
+                    tension: 0.4
+                });
+            }
+            if (showVDOP) {
+                datasets.push({
+                    label: 'VDOP',
+                    data: data.map(d => d.vdop),
+                    borderColor: '#ef4444',
+                    borderWidth: 3,
+                    fill: false,
+                    tension: 0.4
+                });
+            }
+            if (showPDOP) {
+                datasets.push({
+                    label: 'PDOP',
+                    data: data.map(d => d.pdop),
+                    borderColor: '#8b5cf6',
+                    borderWidth: 3,
+                    borderDash: [5, 5],
+                    fill: false,
+                    tension: 0.4
+                });
+            }
+            
             charts.dop = new Chart(dopCtx, {
                 type: 'line',
                 data: {
                     labels: data.map(d => d.time.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })),
-                    datasets: [
-                        {
-                            label: 'HDOP',
-                            data: data.map(d => d.hdop),
-                            borderColor: '#3b82f6',
-                            borderWidth: 3,
-                            fill: false,
-                            tension: 0.4
-                        },
-                        {
-                            label: 'VDOP',
-                            data: data.map(d => d.vdop),
-                            borderColor: '#ef4444',
-                            borderWidth: 3,
-                            fill: false,
-                            tension: 0.4
-                        },
-                        {
-                            label: 'PDOP',
-                            data: data.map(d => d.pdop),
-                            borderColor: '#8b5cf6',
-                            borderWidth: 3,
-                            borderDash: [5, 5],
-                            fill: false,
-                            tension: 0.4
-                        }
-                    ]
+                    datasets: datasets
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    plugins: { legend: { display: true, position: 'top' } }
+                    plugins: {
+                        legend: { display: true, position: 'top' },
+                        tooltip: {
+                            callbacks: {
+                                afterLabel: function(context) {
+                                    const dopValue = context.parsed.y;
+                                    const accuracyCm = calculateAccuracy(dopValue);
+                                    return 'Accuracy: ' + formatAccuracy(accuracyCm);
+                                }
+                            }
+                        }
+                    }
                 }
             });
 
