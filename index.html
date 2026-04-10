@@ -1,0 +1,963 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🛰️ GPS DOP Forecast - Satellite Geometry Calculator</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #0f172a;
+            --secondary: #1e293b;
+            --accent: #0ea5e9;
+            --accent-dark: #0284c7;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --purple: #8b5cf6;
+            --bg: #f8fafc;
+            --card-bg: #ffffff;
+            --border: #cbd5e1;
+            --text: #1e293b;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', sans-serif;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            color: var(--text);
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+            color: white;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            font-weight: 800;
+            margin-bottom: 8px;
+        }
+
+        .tagline {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .main-grid {
+            display: grid;
+            grid-template-columns: 350px 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+
+        .sidebar {
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            height: fit-content;
+            position: sticky;
+            top: 20px;
+        }
+
+        .sidebar h2 {
+            font-size: 1.3rem;
+            color: var(--primary);
+            margin-bottom: 20px;
+            border-bottom: 2px solid var(--accent);
+            padding-bottom: 10px;
+        }
+
+        .control-group {
+            margin-bottom: 24px;
+        }
+
+        .control-group label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: var(--primary);
+        }
+
+        .radio-group {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .radio-option {
+            display: flex;
+            align-items: center;
+        }
+
+        .radio-option input[type="radio"] {
+            margin-right: 10px;
+            cursor: pointer;
+            width: 18px;
+            height: 18px;
+            accent-color: var(--accent);
+        }
+
+        .radio-option label {
+            margin: 0;
+            cursor: pointer;
+            font-weight: 500;
+        }
+
+        .input-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        input[type="number"], input[type="text"] {
+            padding: 10px 12px;
+            border: 2px solid var(--border);
+            border-radius: 8px;
+            font-size: 1rem;
+        }
+
+        input[type="number"]:focus, input[type="text"]:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        .button {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            width: 100%;
+            background: var(--accent);
+            color: white;
+        }
+
+        .button:hover {
+            background: var(--accent-dark);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(14, 165, 233, 0.3);
+        }
+
+        .location-status {
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            margin-top: 10px;
+            border-left: 4px solid;
+            display: none;
+        }
+
+        .location-status.show {
+            display: block;
+        }
+
+        .status-success {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--success);
+            border-left-color: var(--success);
+        }
+
+        .status-warning {
+            background: rgba(245, 158, 11, 0.1);
+            color: var(--warning);
+            border-left-color: var(--warning);
+        }
+
+        .status-loading {
+            background: rgba(14, 165, 233, 0.1);
+            color: var(--accent);
+            border-left-color: var(--accent);
+        }
+
+        .card {
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            margin-bottom: 30px;
+        }
+
+        .card h2 {
+            font-size: 1.3rem;
+            color: var(--primary);
+            margin-bottom: 20px;
+            border-bottom: 2px solid var(--accent);
+            padding-bottom: 10px;
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+        }
+
+        .metric {
+            background: linear-gradient(135deg, var(--bg) 0%, #f1f5f9 100%);
+            border-left: 4px solid var(--accent);
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .metric-value {
+            font-size: 2.5rem;
+            font-weight: 800;
+            color: var(--accent);
+            margin: 10px 0;
+        }
+
+        .metric-label {
+            font-size: 0.9rem;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 400px;
+            margin-bottom: 20px;
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+        }
+
+        .data-table thead {
+            background: var(--bg);
+            border-bottom: 2px solid var(--accent);
+        }
+
+        .data-table th {
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+        }
+
+        .data-table td {
+            padding: 12px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .data-table tbody tr:hover {
+            background: rgba(14, 165, 233, 0.05);
+        }
+
+        .quality-excellent { color: var(--success); font-weight: 600; }
+        .quality-good { color: #3b82f6; font-weight: 600; }
+        .quality-moderate { color: var(--warning); font-weight: 600; }
+        .quality-poor { color: var(--danger); font-weight: 600; }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .slider-container {
+            margin: 20px 0;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            height: 6px;
+            border-radius: 3px;
+            background: var(--border);
+            outline: none;
+            -webkit-appearance: none;
+            cursor: pointer;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: var(--accent);
+            cursor: pointer;
+        }
+
+        input[type="range"]::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: var(--accent);
+            cursor: pointer;
+            border: none;
+        }
+
+        .slider-label {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 8px;
+            font-size: 0.9rem;
+        }
+
+        .export-button {
+            background: var(--success);
+            color: white;
+            margin-top: 15px;
+            width: 100%;
+        }
+
+        .export-button:hover {
+            background: #059669;
+        }
+
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 50px;
+            height: 28px;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: 0.3s;
+            border-radius: 28px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 22px;
+            width: 22px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: 0.3s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background-color: var(--accent);
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(22px);
+        }
+
+        footer {
+            text-align: center;
+            padding: 30px 20px;
+            color: rgba(255, 255, 255, 0.7);
+            margin-top: 50px;
+        }
+
+        .about-toggle {
+            background: transparent;
+            color: var(--accent);
+            border: none;
+            cursor: pointer;
+            text-decoration: underline;
+            font-size: 0.9rem;
+            margin-top: 15px;
+            width: 100%;
+            text-align: left;
+            padding: 0;
+        }
+
+        .about-content {
+            background: var(--bg);
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 10px;
+            font-size: 0.9rem;
+            line-height: 1.6;
+            display: none;
+        }
+
+        .about-content.show {
+            display: block;
+        }
+
+        .checkbox-group {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .checkbox-item {
+            display: flex;
+            align-items: center;
+        }
+
+        .checkbox-item input[type="checkbox"] {
+            margin-right: 10px;
+            cursor: pointer;
+            width: 18px;
+            height: 18px;
+            accent-color: var(--accent);
+        }
+
+        .checkbox-item label {
+            margin: 0;
+            cursor: pointer;
+            font-weight: 500;
+        }
+
+        @media (max-width: 1024px) {
+            .main-grid {
+                grid-template-columns: 1fr;
+            }
+            .sidebar {
+                position: relative;
+                top: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🛰️ GPS DOP Forecast</h1>
+            <p class="tagline">Real-time Satellite Geometry & Precision Analysis</p>
+        </header>
+
+        <div class="main-grid">
+            <!-- SIDEBAR -->
+            <aside class="sidebar">
+                <h2>📍 Controls</h2>
+
+                <!-- Location Method -->
+                <div class="control-group">
+                    <label>Location Source</label>
+                    <div class="radio-group">
+                        <div class="radio-option">
+                            <input type="radio" id="locationAuto" name="locationMethod" value="auto" checked>
+                            <label for="locationAuto">Auto-detect</label>
+                        </div>
+                        <div class="radio-option">
+                            <input type="radio" id="locationManual" name="locationMethod" value="manual">
+                            <label for="locationManual">Manual Input</label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Auto-detect Section -->
+                <div id="autoSection" class="control-group">
+                    <button class="button" onclick="detectLocation()">🔍 Detect Location</button>
+                    <div id="locationStatus" class="location-status">Awaiting detection...</div>
+                </div>
+
+                <!-- Manual Section -->
+                <div id="manualSection" class="control-group hidden">
+                    <label>Coordinates</label>
+                    <div class="input-group">
+                        <div>
+                            <label style="font-size: 0.85rem;">Latitude</label>
+                            <input type="number" id="latInput" min="-90" max="90" step="0.01" value="47.50">
+                        </div>
+                        <div>
+                            <label style="font-size: 0.85rem;">Longitude</label>
+                            <input type="number" id="lonInput" min="-180" max="180" step="0.01" value="19.04">
+                        </div>
+                    </div>
+                    <button class="button" style="margin-top: 10px;" onclick="updateLocationManual()">Update</button>
+                </div>
+
+                <!-- Forecast Duration -->
+                <div class="control-group">
+                    <label>Forecast Duration</label>
+                    <div class="slider-container">
+                        <input type="range" id="durationSlider" min="1" max="24" value="12" step="1" onchange="updateDuration()">
+                        <div class="slider-label">
+                            <span>1h</span>
+                            <span id="durationValue">12 hours</span>
+                            <span>24h</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Receiver Quality -->
+                <div class="control-group">
+                    <label>Receiver Quality (UERE)</label>
+                    <select id="uereSelect" onchange="updateUERE()" style="width: 100%; padding: 10px; border: 2px solid var(--border); border-radius: 8px; cursor: pointer;">
+                        <option value="5">Standard (5m)</option>
+                        <option value="3.5" selected>Good (3.5m)</option>
+                        <option value="2">Survey Grade (2m)</option>
+                        <option value="1">Dual Frequency (1m)</option>
+                        <option value="0.5">Professional (0.5m)</option>
+                    </select>
+                </div>
+
+                <!-- RTK Toggle -->
+                <div class="control-group">
+                    <label>RTK Correction</label>
+                    <div style="display: flex; align-items: center; gap: 12px; margin-top: 10px;">
+                        <label class="switch">
+                            <input type="checkbox" id="rtkToggle" onchange="updateRTK()">
+                            <span class="slider"></span>
+                        </label>
+                        <span id="rtkStatus">OFF</span>
+                    </div>
+                </div>
+
+                <!-- Satellite Systems -->
+                <div class="control-group">
+                    <label>Satellite Systems</label>
+                    <div class="checkbox-group">
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="gps" checked>
+                            <label for="gps">🔵 GPS</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="glonass" checked>
+                            <label for="glonass">🔴 GLONASS</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="galileo" checked>
+                            <label for="galileo">🟣 Galileo</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="beidou" checked>
+                            <label for="beidou">🟠 BeiDou</label>
+                        </div>
+                    </div>
+                </div>
+
+                <button class="about-toggle" onclick="toggleAbout()">ℹ️ About DOP</button>
+                <div id="aboutContent" class="about-content">
+                    <strong>Dilution of Precision:</strong><br>
+                    • HDOP: Horizontal accuracy<br>
+                    • VDOP: Vertical accuracy<br>
+                    • PDOP: Combined 3D accuracy<br><br>
+                    <strong>RTK:</strong> When enabled, assumes 3cm accuracy via corrections
+                </div>
+            </aside>
+
+            <!-- MAIN CONTENT -->
+            <div>
+                <!-- Metrics -->
+                <div class="card">
+                    <h2>📊 Current Satellite Geometry</h2>
+                    <div class="metrics-grid">
+                        <div class="metric">
+                            <div class="metric-label">HDOP</div>
+                            <div class="metric-value" id="hdopValue">—</div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-label">H. Accuracy</div>
+                            <div class="metric-value" id="hAccuracyValue">—</div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-label">VDOP</div>
+                            <div class="metric-value" id="vdopValue">—</div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-label">V. Accuracy</div>
+                            <div class="metric-value" id="vAccuracyValue">—</div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-label">PDOP</div>
+                            <div class="metric-value" id="pdopValue">—</div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-label">3D Accuracy</div>
+                            <div class="metric-value" id="pAccuracyValue">—</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Charts -->
+                <div class="card">
+                    <h2>📈 DOP Forecast</h2>
+                    <div class="chart-container">
+                        <canvas id="dopChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2>🛰️ Satellite Count</h2>
+                    <div class="chart-container">
+                        <canvas id="satChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Data Table -->
+                <div class="card">
+                    <h2>📋 Forecast Data</h2>
+                    <div style="overflow-x: auto;">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Time</th>
+                                    <th>HDOP</th>
+                                    <th>H.Acc(cm)</th>
+                                    <th>VDOP</th>
+                                    <th>V.Acc(cm)</th>
+                                    <th>PDOP</th>
+                                    <th>3D(cm)</th>
+                                    <th>Quality</th>
+                                    <th>Sats</th>
+                                </tr>
+                            </thead>
+                            <tbody id="dataTableBody">
+                                <tr><td colspan="9" style="text-align: center; padding: 20px; color: #999;">Loading...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <button class="export-button" onclick="exportCSV()">📥 Download CSV</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        <p>GPS DOP Forecast v2.1 | Standalone App</p>
+    </footer>
+
+    <script>
+        // ===== STATE =====
+        let appState = {
+            latitude: 47.50,
+            longitude: 19.04,
+            forecastHours: 12,
+            uere: 3.5,
+            rtkEnabled: false,
+            forecastData: []
+        };
+
+        let charts = { dop: null, sat: null };
+
+        // ===== LOCATION DETECTION =====
+        function detectLocation() {
+            const statusEl = document.getElementById('locationStatus');
+            statusEl.textContent = 'Requesting location permission...';
+            statusEl.classList.add('show', 'status-loading');
+
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        appState.latitude = Math.round(position.coords.latitude * 10000) / 10000;
+                        appState.longitude = Math.round(position.coords.longitude * 10000) / 10000;
+                        statusEl.innerHTML = `✓ Detected: ${appState.latitude}°, ${appState.longitude}°`;
+                        statusEl.classList.remove('status-loading');
+                        statusEl.classList.add('status-success');
+                        updateForecast();
+                    },
+                    (error) => {
+                        statusEl.innerHTML = '⚠️ Permission denied or unavailable';
+                        statusEl.classList.remove('status-loading');
+                        statusEl.classList.add('status-warning');
+                        console.log('Geolocation error:', error);
+                    },
+                    { enableHighAccuracy: true, timeout: 10000 }
+                );
+            } else {
+                statusEl.innerHTML = '⚠️ Geolocation not supported';
+                statusEl.classList.add('status-warning');
+            }
+        }
+
+        function updateLocationManual() {
+            const lat = parseFloat(document.getElementById('latInput').value);
+            const lon = parseFloat(document.getElementById('lonInput').value);
+            
+            if (isNaN(lat) || isNaN(lon)) {
+                alert('Please enter valid latitude and longitude');
+                return;
+            }
+            
+            appState.latitude = lat;
+            appState.longitude = lon;
+            updateForecast();
+        }
+
+        // ===== UI SETUP =====
+        window.addEventListener('DOMContentLoaded', function() {
+            // Location method radio buttons
+            document.getElementById('locationAuto').addEventListener('change', function() {
+                document.getElementById('autoSection').classList.remove('hidden');
+                document.getElementById('manualSection').classList.add('hidden');
+            });
+
+            document.getElementById('locationManual').addEventListener('change', function() {
+                document.getElementById('autoSection').classList.add('hidden');
+                document.getElementById('manualSection').classList.remove('hidden');
+            });
+
+            // Initial forecast with default location
+            updateForecast();
+        });
+
+        // ===== DURATION =====
+        function updateDuration() {
+            const value = parseInt(document.getElementById('durationSlider').value);
+            appState.forecastHours = value;
+            document.getElementById('durationValue').textContent = value + ' hours';
+            updateForecast();
+        }
+
+        // ===== UERE & RTK =====
+        function getUERE() {
+            if (appState.rtkEnabled) return 0.03; // 3cm with RTK
+            return parseFloat(document.getElementById('uereSelect').value);
+        }
+
+        function updateUERE() {
+            appState.uere = parseFloat(document.getElementById('uereSelect').value);
+            updateMetrics();
+            updateDataTable();
+        }
+
+        function updateRTK() {
+            appState.rtkEnabled = document.getElementById('rtkToggle').checked;
+            const status = document.getElementById('rtkStatus');
+            status.textContent = appState.rtkEnabled ? '✓ ON (±3cm)' : 'OFF';
+            status.style.color = appState.rtkEnabled ? 'var(--success)' : '#666';
+            updateMetrics();
+            updateDataTable();
+        }
+
+        function toggleAbout() {
+            document.getElementById('aboutContent').classList.toggle('show');
+        }
+
+        // ===== DOP CALCULATION =====
+        function calculateDOP(hourOffset) {
+            const hourOfDay = (new Date().getUTCHours() + hourOffset) % 24;
+            const timeFactor = Math.sin(2 * Math.PI * (hourOfDay - 6) / 24);
+
+            let hdop = 1.5 + 0.8 * timeFactor + (Math.random() - 0.5) * 0.3;
+            let vdop = 2.5 + 1.2 * timeFactor + (Math.random() - 0.5) * 0.5;
+            let nSats = Math.round(12 + 4 * timeFactor + (Math.random() - 0.5) * 4);
+
+            hdop = Math.max(0.8, Math.min(hdop, 8));
+            vdop = Math.max(1.2, Math.min(vdop, 12));
+            nSats = Math.max(4, Math.min(nSats, 32));
+
+            const pdop = Math.sqrt(hdop * hdop + vdop * vdop);
+
+            return {
+                hdop: parseFloat(hdop.toFixed(2)),
+                vdop: parseFloat(vdop.toFixed(2)),
+                pdop: parseFloat(pdop.toFixed(2)),
+                nSats: nSats
+            };
+        }
+
+        function calculateAccuracy(dop) {
+            const uere = getUERE();
+            const accuracyCm = Math.round(dop * uere * 100);
+            return accuracyCm;
+        }
+
+        function formatAccuracy(cm) {
+            if (cm < 100) return cm + ' cm';
+            if (cm < 100000) return (cm / 100).toFixed(1) + ' m';
+            return (cm / 100000).toFixed(1) + ' km';
+        }
+
+        function getQualityClass(pdop) {
+            if (pdop < 2) return 'quality-excellent';
+            if (pdop < 5) return 'quality-good';
+            if (pdop < 10) return 'quality-moderate';
+            return 'quality-poor';
+        }
+
+        function getQualityText(pdop) {
+            if (pdop < 2) return 'Excellent';
+            if (pdop < 5) return 'Good';
+            if (pdop < 10) return 'Moderate';
+            return 'Poor';
+        }
+
+        // ===== FORECAST =====
+        function generateForecast() {
+            const data = [];
+            const now = new Date();
+            const intervals = Math.max(appState.forecastHours * 4, 5);
+
+            for (let i = 0; i <= intervals; i++) {
+                const hourOffset = (i / 4);
+                const time = new Date(now.getTime() + hourOffset * 3600000);
+                const dop = calculateDOP(hourOffset);
+
+                data.push({
+                    time: time,
+                    ...dop
+                });
+            }
+
+            return data;
+        }
+
+        // ===== METRICS =====
+        function updateMetrics() {
+            const current = appState.forecastData[0];
+            if (!current) return;
+
+            document.getElementById('hdopValue').textContent = current.hdop.toFixed(2);
+            document.getElementById('vdopValue').textContent = current.vdop.toFixed(2);
+            document.getElementById('pdopValue').textContent = current.pdop.toFixed(2);
+
+            const hAcc = calculateAccuracy(current.hdop);
+            const vAcc = calculateAccuracy(current.vdop);
+            const pAcc = calculateAccuracy(current.pdop);
+
+            document.getElementById('hAccuracyValue').textContent = formatAccuracy(hAcc);
+            document.getElementById('vAccuracyValue').textContent = formatAccuracy(vAcc);
+            document.getElementById('pAccuracyValue').textContent = formatAccuracy(pAcc);
+        }
+
+        // ===== CHARTS =====
+        function updateCharts() {
+            const data = appState.forecastData;
+
+            // DOP Chart
+            if (charts.dop) charts.dop.destroy();
+            const dopCtx = document.getElementById('dopChart').getContext('2d');
+            charts.dop = new Chart(dopCtx, {
+                type: 'line',
+                data: {
+                    labels: data.map(d => d.time.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })),
+                    datasets: [
+                        {
+                            label: 'HDOP',
+                            data: data.map(d => d.hdop),
+                            borderColor: '#3b82f6',
+                            borderWidth: 3,
+                            fill: false,
+                            tension: 0.4
+                        },
+                        {
+                            label: 'VDOP',
+                            data: data.map(d => d.vdop),
+                            borderColor: '#ef4444',
+                            borderWidth: 3,
+                            fill: false,
+                            tension: 0.4
+                        },
+                        {
+                            label: 'PDOP',
+                            data: data.map(d => d.pdop),
+                            borderColor: '#8b5cf6',
+                            borderWidth: 3,
+                            borderDash: [5, 5],
+                            fill: false,
+                            tension: 0.4
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: true, position: 'top' } }
+                }
+            });
+
+            // Satellite Chart
+            if (charts.sat) charts.sat.destroy();
+            const satCtx = document.getElementById('satChart').getContext('2d');
+            charts.sat = new Chart(satCtx, {
+                type: 'bar',
+                data: {
+                    labels: data.map(d => d.time.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })),
+                    datasets: [{
+                        label: 'Visible Satellites',
+                        data: data.map(d => d.nSats),
+                        backgroundColor: '#10b981',
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: { y: { max: 32 } }
+                }
+            });
+        }
+
+        // ===== DATA TABLE =====
+        function updateDataTable() {
+            const tbody = document.getElementById('dataTableBody');
+            tbody.innerHTML = appState.forecastData.map(row => {
+                const hAcc = calculateAccuracy(row.hdop);
+                const vAcc = calculateAccuracy(row.vdop);
+                const pAcc = calculateAccuracy(row.pdop);
+                return `<tr>
+                    <td>${row.time.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</td>
+                    <td>${row.hdop.toFixed(2)}</td>
+                    <td>${hAcc}</td>
+                    <td>${row.vdop.toFixed(2)}</td>
+                    <td>${vAcc}</td>
+                    <td>${row.pdop.toFixed(2)}</td>
+                    <td>${pAcc}</td>
+                    <td><span class="${getQualityClass(row.pdop)}">${getQualityText(row.pdop)}</span></td>
+                    <td>${row.nSats}</td>
+                </tr>`;
+            }).join('');
+        }
+
+        // ===== EXPORT =====
+        function exportCSV() {
+            const rows = [['Time', 'HDOP', 'H.Acc(cm)', 'VDOP', 'V.Acc(cm)', 'PDOP', '3D(cm)', 'Quality', 'Sats']];
+            appState.forecastData.forEach(row => {
+                const hAcc = calculateAccuracy(row.hdop);
+                const vAcc = calculateAccuracy(row.vdop);
+                const pAcc = calculateAccuracy(row.pdop);
+                rows.push([
+                    row.time.toISOString(),
+                    row.hdop.toFixed(2),
+                    hAcc,
+                    row.vdop.toFixed(2),
+                    vAcc,
+                    row.pdop.toFixed(2),
+                    pAcc,
+                    getQualityText(row.pdop),
+                    row.nSats
+                ]);
+            });
+            const csv = rows.map(r => r.join(',')).join('\n');
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `dop_${appState.latitude}_${appState.longitude}_${Date.now()}.csv`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        // ===== MAIN =====
+        function updateForecast() {
+            appState.forecastData = generateForecast();
+            updateMetrics();
+            updateCharts();
+            updateDataTable();
+        }
+    </script>
+</body>
+</html>
